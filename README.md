@@ -13,13 +13,10 @@ To receive email, configure SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP
 
 The daily summary is created and delivered by `GET /api/cron/daily`; Vercel runs it at 06:00 Harare time (04:00 UTC). Local development does not run the Vercel schedule, so trigger that route manually to test a summary.
 
-## React Native app
-The Expo app in `mobile/` supports iOS and Android and shares accounts, bookings, and notifications with the web app. Its interface and splash screen use a clean white background.
+## Native React Native app
+The `mobile/` folder contains a bare React Native CLI app for iOS and Android; it does not use Expo or Expo Go. It shares accounts, bookings, and notifications with the web backend, with a white interface and red buttons matching the logo.
 
-1. Start the backend with `npm run dev`.
-2. Copy `mobile/.env.example` to `mobile/.env`. Set `EXPO_PUBLIC_API_URL` to the backend URL reachable from your phone or emulator: use `http://10.0.2.2:3000` for the Android emulator, `http://localhost:3000` for the iOS simulator, or your computer's LAN IP for a physical device.
-3. In `mobile/`, run `npm install`, then `npx expo install expo-notifications expo-device expo-constants expo-secure-store`, then `npm start`.
-4. Open the project in Expo Go on a physical device to sign in and manage bookings. Remote push delivery requires an EAS-built native app (it is not available in Expo Go). From `mobile/`, run `npx eas-cli@latest init` and configure Android/iOS push credentials in EAS. EAS adds the project ID to the app config; for local overrides, set `EXPO_PUBLIC_EAS_PROJECT_ID` in `mobile/.env`. Build an Android test APK with `npx eas-cli@latest build --profile preview --platform android`; production builds use the `production` profile in `mobile/eas.json`.
+Follow [mobile/README.md](./mobile/README.md) to configure the backend and run the native app. Android requires Android Studio and an emulator or connected phone. Building the iOS app requires macOS and Xcode.
 
 ## Deploying
 SQLite is for local use only. For Vercel switch `provider` in `prisma/schema.prisma` to `postgresql` and set DATABASE_URL (Neon, Supabase, etc.), then run `npx prisma db push`.

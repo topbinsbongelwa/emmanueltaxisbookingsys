@@ -5,8 +5,11 @@ node_modules/
 prisma/*.db*
 
 mobile/node_modules/
-mobile/.expo/
 mobile/.env*
 !mobile/.env.example
 mobile/dist/
 mobile/web-build/
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/ios/Pods/
+mobile/ios/build/

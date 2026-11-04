@@ -6,11 +6,22 @@ export default function Login() {
   const [mode, setMode] = useState("login");
   const [f, setF] = useState({ name: "", email: "", password: "", code: "" });
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   async function go(e) {
-    e.preventDefault(); setErr("");
-    const x = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...f, mode }) });
-    if (x.ok) r.push("/dashboard"); else setErr((await x.json()).error || "Something went wrong.");
+    e.preventDefault();
+    if (busy) return;
+    setErr(""); setBusy(true);
+    try {
+      const x = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...f, mode }) });
+      const result = await x.json();
+      if (!x.ok) { setErr(result.error || "Something went wrong."); return; }
+      r.replace("/dashboard");
+    } catch {
+      setErr("Could not connect. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <form className="card login" onSubmit={go}>
@@ -21,8 +32,8 @@ export default function Login() {
       {mode === "signup" && <><label>Invite code (not needed for the very first account)</label><input value={f.code} onChange={set("code")} /></>}
       {err && <div className="err">{err}</div>}
       <div className="bar" style={{ marginTop: 14 }}>
-        <button>{mode === "login" ? "Log in" : "Create account"}</button>
-        <button type="button" className="g" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setErr(""); }}>
+        <button disabled={busy}>{busy ? "Please wait..." : mode === "login" ? "Log in" : "Create account"}</button>
+        <button type="button" className="g" disabled={busy} onClick={() => { setMode(mode === "login" ? "signup" : "login"); setErr(""); }}>
           {mode === "login" ? "Create an account" : "I have an account"}
         </button>
       </div>
