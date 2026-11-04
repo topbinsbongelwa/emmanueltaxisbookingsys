@@ -96,6 +96,21 @@ button.g {
 }
 button.g:hover { background: var(--soft); border-color: var(--navy); }
 button.s { padding: 5px 10px; font-size: 12px; }
+a.wa-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
+  border: 1px solid #1ebe5a;
+  border-radius: 9px;
+  background: #25d366;
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background .15s ease, border-color .15s ease;
+}
+a.wa-link:hover { background: #1ebe5a; border-color: #19a94f; }
+a.wa-link.wide { margin-top: 5px; width: 100%; min-height: 42px; }
 
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }

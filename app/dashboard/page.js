@@ -5,12 +5,14 @@ const hd = (n = 0) => { const d = new Date(Date.now() + 7200e3); d.setUTCDate(d.
 const pad = (n) => String(n).padStart(2, "0");
 const statusOf = (b) => (b.status === "done" ? "approved" : b.status);
 const STATUS_LABEL = { pending: "Pending", booked: "Booked", approved: "Approved", cancelled: "Cancelled" };
-const blank = { time: "08:00", type: "transfer", pickup: "", dest: "", pax: 1, guest: "", phone: "", driver: "", vehicle: "", notes: "" };
+const blank = { time: "08:00", type: "transfer", pickup: "", dest: "", pax: 1, guest: "", email: "", phone: "", driver: "", vehicle: "", notes: "" };
+const BUSINESS_WHATSAPP = "263772645104";
 const J = { "Content-Type": "application/json" };
 const COLORS = ["pending", "booked", "approved"];
 export default function Dash() {
   const r = useRouter();
   const [B, setB] = useState([]), [N, setN] = useState([]), [day, setDay] = useState(hd()), [month, setMonth] = useState(hd().slice(0, 7)), [f, setF] = useState(blank), [err, setErr] = useState("");
+  const [me, setMe] = useState(null);
   const [ready, setReady] = useState(false);
   const [browserPermission, setBrowserPermission] = useState("");
   const seenNotifications = useRef(new Set());
@@ -44,6 +46,7 @@ export default function Dash() {
   useEffect(() => {
     if ("Notification" in window) setBrowserPermission(Notification.permission);
     else setBrowserPermission("unsupported");
+    fetch("/api/auth").then((x) => (x.ok ? x.json() : null)).then((data) => data?.user && setMe(data.user)).catch(() => {});
   }, []);
   useEffect(() => {
     load();
@@ -89,6 +92,8 @@ export default function Dash() {
   const read = async () => { await fetch("/api/notifications", { method: "POST" }); load(); };
   const out = async () => { await fetch("/api/auth", { method: "POST", headers: J, body: JSON.stringify({ mode: "logout" }) }); r.push("/login"); };
   const t = hd(), wk = hd(7), mo = t.slice(0, 7);
+  const harareHour = new Date(Date.now() + 7200e3).getUTCHours();
+  const greeting = harareHour < 12 ? "Good morning" : harareHour < 17 ? "Good afternoon" : "Good evening";
   const dayB = B.filter((b) => b.date === day);
   const opts = (k) => [...new Set(B.map((b) => b[k]).filter(Boolean))].map((v) => <option key={v} value={v} />);
   const unread = N.filter((n) => !n.read).length;
@@ -130,10 +135,10 @@ export default function Dash() {
 
   return (
     <div className="w">
-      <div className="bar" style={{ marginBottom: 12 }}><div className="brand"><img src="/logo.png" alt="Emmanuel Tours & Transfers, Victoria Falls" /><h2>Bookings</h2></div><button className="g" onClick={out}>Log out</button></div>
+      <div className="bar" style={{ marginBottom: 12 }}><div className="brand"><img src="/logo.png" alt="Emmanuel Tours & Transfers, Victoria Falls" /><h2>Bookings</h2></div><div className="bar"><a className="g wa-link" href={`https://wa.me/${BUSINESS_WHATSAPP}`} target="_blank" rel="noreferrer">WhatsApp</a><button className="g" onClick={out}>Log out</button></div></div>
       <div className="dashboard-intro">
-        <div><p className="eyebrow">OPERATIONS</p><h1>Bookings dashboard</h1></div>
-        <p>Manage trips, guests, and daily activity.</p>
+        <div><p className="eyebrow">OPERATIONS</p><h1>{greeting}, {me?.name || "there"}</h1></div>
+        <p>Your booking system</p>
       </div>
       {err && <div className="err">{err}</div>}
       <div className="stats">
@@ -190,7 +195,7 @@ export default function Dash() {
           <div key={b.id} className={"bk " + statusOf(b)}>
             <div className="bar"><strong>{b.time} · {b.pickup} to {b.dest}</strong><span className={"status-tag " + statusOf(b)}>{STATUS_LABEL[statusOf(b)] || b.status}</span></div>
             <small>{b.pax} guest{b.pax > 1 ? "s" : ""} · {b.driver || "no driver"} · {b.vehicle || "no vehicle"} · {b.type}</small>
-            {(b.guest || b.phone) && <small>{b.guest} {b.phone}</small>}{b.notes && <small>{b.notes}</small>}
+            {(b.guest || b.phone || b.email) && <small>{b.guest} {b.phone} {b.email}</small>}{b.notes && <small>{b.notes}</small>}
             <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
               {b.status === "pending" && <><button className="s" onClick={() => mark(b.id, "booked")}>Mark booked</button><button className="s approve" onClick={() => mark(b.id, "approved")}>Approve</button><button className="g s" onClick={() => mark(b.id, "cancelled")}>Cancel</button></>}
               {b.status === "booked" && <><button className="s approve" onClick={() => mark(b.id, "approved")}>Approve</button><button className="g s" onClick={() => mark(b.id, "cancelled")}>Cancel</button></>}
@@ -210,8 +215,10 @@ export default function Dash() {
           <div><label>Vehicle</label><input list="v" value={f.vehicle} onChange={set("vehicle")} /></div></div>
         <div className="row"><div><label>Guests</label><input type="number" min="1" value={f.pax} onChange={set("pax")} /></div>
           <div><label>Guest name</label><input value={f.guest} onChange={set("guest")} /></div></div>
-        <div className="row"><div><label>Guest phone</label><input value={f.phone} onChange={set("phone")} /></div>
-          <div><label>Notes</label><input value={f.notes} onChange={set("notes")} /></div></div>
+        <div className="row"><div><label>Guest email</label><input type="email" value={f.email} onChange={set("email")} placeholder="guest@example.com" /></div>
+          <div><label>Guest phone</label><input value={f.phone} onChange={set("phone")} /></div></div>
+        <div className="row"><div><label>Notes</label><input value={f.notes} onChange={set("notes")} /></div>
+          <div><label>WhatsApp notifications</label><a className="wa-link wide" href={`https://wa.me/${BUSINESS_WHATSAPP}`} target="_blank" rel="noreferrer">Chat on +263 772 645 104</a></div></div>
         <datalist id="d">{opts("driver")}</datalist><datalist id="v">{opts("vehicle")}</datalist>
         <button style={{ marginTop: 12 }}>Save booking</button>
       </form>

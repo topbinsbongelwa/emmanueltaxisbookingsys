@@ -1,9 +1,14 @@
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
-import { setSession } from "@/lib/auth";
+import { getSession, setSession } from "@/lib/auth";
 import { withApi } from "@/lib/api";
 const no = (error, status = 400) => Response.json({ error }, { status });
+export const GET = withApi(async () => {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "Sign in" }, { status: 401 });
+  return Response.json({ user: { id: session.id, name: session.name, role: session.role } });
+});
 export const POST = withApi(async (req) => {
   const b = await req.json();
   if (b.mode === "logout") { cookies().delete("s"); return Response.json({ ok: true }); }

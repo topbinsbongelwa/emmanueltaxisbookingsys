@@ -11,9 +11,9 @@ export const PATCH = withApi(async (req, { params }) => {
   const booking = await prisma.booking.update({ where: { id: params.id }, data: changes });
   const changed = Object.keys(changes).filter((key) => changes[key] !== previous[key]);
   if (changed.length) {
-    const details = `${booking.date} ${booking.time}: ${booking.pickup} to ${booking.dest}; ${booking.pax} guest${booking.pax === 1 ? "" : "s"}${booking.guest ? `; ${booking.guest}` : ""}`;
+    const details = `${booking.date} ${booking.time}: ${booking.pickup} to ${booking.dest}; ${booking.pax} guest${booking.pax === 1 ? "" : "s"}${booking.guest ? `; ${booking.guest}` : ""}${booking.email ? `; ${booking.email}` : ""}`;
     const titles = { pending: "Booking pending", booked: "Booking booked", approved: "Booking approved", cancelled: "Booking cancelled" };
-    await publishNotification(titles[booking.status] || "Booking updated", `${details}\nChanged: ${changed.join(", ")}`);
+    await publishNotification(titles[booking.status] || "Booking updated", `${details}\nChanged: ${changed.join(", ")}`, { emailTo: booking.email });
   }
   return Response.json(booking);
 });
@@ -23,6 +23,6 @@ export const DELETE = withApi(async (_req, { params }) => {
   const booking = await prisma.booking.findUnique({ where: { id: params.id } });
   if (!booking) return Response.json({ error: "Booking not found" }, { status: 404 });
   await prisma.booking.delete({ where: { id: params.id } });
-  await publishNotification("Booking deleted", `${booking.date} ${booking.time}: ${booking.pickup} to ${booking.dest}`);
+  await publishNotification("Booking deleted", `${booking.date} ${booking.time}: ${booking.pickup} to ${booking.dest}`, { emailTo: booking.email });
   return Response.json({ ok: true });
 });

@@ -26,6 +26,7 @@ model Booking {
   dest      String
   pax       Int      @default(1)
   guest     String   @default("")
+  email     String   @default("")
   phone     String   @default("")
   driver    String   @default("")
   vehicle   String   @default("")
