@@ -12,8 +12,17 @@ export default function Login() {
     setErr(""); setBusy(true);
     try {
       const x = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...f, mode }) });
-      const result = await x.json();
-      if (!x.ok) { setErr(result.error || "Something went wrong."); return; }
+      const text = await x.text();
+      let result = {};
+      try { result = text ? JSON.parse(text) : {}; } catch { result = {}; }
+      if (!x.ok) {
+        setErr(result.error || `The server could not complete the request (${x.status}). Please try again.`);
+        return;
+      }
+      if (!result.ok) {
+        setErr(result.error || "The server returned an unexpected response. Please try again.");
+        return;
+      }
       window.location.replace("/dashboard");
     } catch {
       setErr("Could not connect. Check your connection and try again.");

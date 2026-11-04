@@ -2,8 +2,9 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { setSession } from "@/lib/auth";
+import { withApi } from "@/lib/api";
 const no = (error, status = 400) => Response.json({ error }, { status });
-export async function POST(req) {
+export const POST = withApi(async (req) => {
   const b = await req.json();
   if (b.mode === "logout") { cookies().delete("s"); return Response.json({ ok: true }); }
   const email = String(b.email || "").trim().toLowerCase(), password = String(b.password || "");
@@ -20,4 +21,4 @@ export async function POST(req) {
   if (!u || !(await bcrypt.compare(password, u.password))) return no("Wrong email or password.", 401);
   const token = await setSession(u);
   return Response.json({ ok: true, token, user: { id: u.id, name: u.name, email: u.email, role: u.role } });
-}
+});
