@@ -1,8 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 export default function Login() {
-  const r = useRouter();
   const [mode, setMode] = useState("login");
   const [f, setF] = useState({ name: "", email: "", password: "", code: "" });
   const [err, setErr] = useState("");
@@ -16,7 +14,7 @@ export default function Login() {
       const x = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...f, mode }) });
       const result = await x.json();
       if (!x.ok) { setErr(result.error || "Something went wrong."); return; }
-      r.replace("/dashboard");
+      window.location.replace("/dashboard");
     } catch {
       setErr("Could not connect. Check your connection and try again.");
     } finally {

@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("staff")
+  createdAt DateTime @default(now())
+  devices   Device[]
+}
+
+model Booking {
+  id        String   @id @default(cuid())
+  date      String
+  time      String
+  type      String   @default("transfer")
+  pickup    String
+  dest      String
+  pax       Int      @default(1)
+  guest     String   @default("")
+  phone     String   @default("")
+  driver    String   @default("")
+  vehicle   String   @default("")
+  notes     String   @default("")
+  status    String   @default("booked")
+  createdBy String
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Device {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}

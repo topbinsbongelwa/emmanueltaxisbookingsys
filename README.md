@@ -19,7 +19,14 @@ The `mobile/` folder contains a bare React Native CLI app for iOS and Android; i
 Follow [mobile/README.md](./mobile/README.md) to configure the backend and run the native app. Android requires Android Studio and an emulator or connected phone. Building the iOS app requires macOS and Xcode.
 
 ## Deploying
-SQLite is for local use only. For Vercel switch `provider` in `prisma/schema.prisma` to `postgresql` and set DATABASE_URL (Neon, Supabase, etc.), then run `npx prisma db push`.
+SQLite is for local development only. Vercel builds generate the PostgreSQL Prisma client from `prisma/schema.postgres.prisma`; local development keeps using `prisma/schema.prisma`.
+
+1. Add a PostgreSQL database through the Vercel Marketplace or a provider such as Neon or Supabase.
+2. Set `DATABASE_URL`, `AUTH_SECRET`, `SIGNUP_CODE`, and `CRON_SECRET` in the Vercel project's Production environment. Use a long, unique random value for each secret. Add the same variables to Preview if preview deployments need to work.
+3. Before first use, run `npm run db:postgres` with the production `DATABASE_URL` set to create the tables. Do not use the local SQLite URL for this command.
+4. Redeploy the project. Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, and optionally `ADMIN_EMAIL` in Vercel only if email notifications are wanted. In-app notifications are stored in PostgreSQL; browser alerts require each dashboard user to click **Enable browser alerts** and allow them in the browser.
+
+Keep the model definitions in both Prisma schemas in sync when changing the database models.
 
 ## WhatsApp note
 Meta's Cloud API only allows free-text messages within 24 hours of the admin last messaging your business number. For reliable notifications outside this window, create an approved message template and send that instead (change the body in `lib/digest.js`).

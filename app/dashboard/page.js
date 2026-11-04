@@ -53,6 +53,10 @@ export default function Dash() {
   return (
     <div className="w">
       <div className="bar" style={{ marginBottom: 12 }}><div className="brand"><img src="/logo.png" alt="Emmanuel Tours & Transfers, Victoria Falls" /><h2>Bookings</h2></div><button className="g" onClick={out}>Log out</button></div>
+      <div className="dashboard-intro">
+        <div><p className="eyebrow">OPERATIONS</p><h1>Bookings dashboard</h1></div>
+        <p>Manage trips, guests, and daily activity.</p>
+      </div>
       <div className="stats">
         <div className="card"><b>{B.filter((b) => b.date === t && b.status === "booked").length}</b>Today</div>
         <div className="card"><b>{B.filter((b) => b.date > t && b.date <= wk && b.status === "booked").length}</b>Next 7 days</div>
