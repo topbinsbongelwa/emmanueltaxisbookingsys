@@ -73,6 +73,27 @@ input:focus, select:focus {
   outline: 3px solid rgba(215, 25, 53, .14);
   border-color: var(--red);
 }
+.password-field { position: relative; }
+.password-field input { padding-right: 46px; }
+.password-field .eye {
+  position: absolute;
+  top: calc(50% + 2.5px);
+  right: 6px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+}
+.password-field .eye:hover { background: var(--soft); border-color: transparent; color: var(--navy); }
+.password-field .eye:focus-visible { outline: 3px solid rgba(215, 25, 53, .25); outline-offset: 1px; }
 label { font-size: 12px; color: var(--muted); display: block; margin-top: 10px; }
 button {
   background: var(--red);
