@@ -2,11 +2,13 @@
 import { useState } from "react";
 export default function Login() {
   const [mode, setMode] = useState("login");
-  const [f, setF] = useState({ name: "", email: "", password: "", code: "" });
+  const [f, setF] = useState({ name: "", email: "", password: "" });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const set = (k) => (e) => {
+    setF({ ...f, [k]: e.target.value });
+  }
   async function go(e) {
     e.preventDefault();
     if (busy) return;
@@ -47,7 +49,6 @@ export default function Login() {
           )}
         </button>
       </div>
-      {mode === "signup" && <><label>Invite code (not needed for the very first account)</label><input value={f.code} onChange={set("code")} /></>}
       {err && <div className="err">{err}</div>}
       <div className="bar" style={{ marginTop: 14 }}>
         <button disabled={busy}>{busy ? "Please wait..." : mode === "login" ? "Log in" : "Create account"}</button>

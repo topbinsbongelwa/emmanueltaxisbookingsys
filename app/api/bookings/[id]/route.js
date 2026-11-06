@@ -8,7 +8,9 @@ export const PATCH = withApi(async (req, { params }) => {
   const previous = await prisma.booking.findUnique({ where: { id: params.id } });
   if (!previous) return Response.json({ error: "Booking not found" }, { status: 404 });
   const changes = pick(await req.json());
-  const booking = await prisma.booking.update({ where: { id: params.id }, data: changes });
+  const data = { ...changes };
+  if (changes.date && changes.date !== previous.date) data.reminderSent = false;
+  const booking = await prisma.booking.update({ where: { id: params.id }, data });
   const changed = Object.keys(changes).filter((key) => changes[key] !== previous[key]);
   if (changed.length) {
     const details = `${booking.date} ${booking.time}: ${booking.pickup} to ${booking.dest}; ${booking.pax} guest${booking.pax === 1 ? "" : "s"}${booking.guest ? `; ${booking.guest}` : ""}${booking.email ? `; ${booking.email}` : ""}`;

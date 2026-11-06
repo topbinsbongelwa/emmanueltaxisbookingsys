@@ -32,6 +32,7 @@ model Booking {
   vehicle   String   @default("")
   notes     String   @default("")
   status    String   @default("booked")
+  reminderSent Boolean @default(false)
   createdBy String
   createdAt DateTime @default(now())
 }
@@ -50,4 +51,12 @@ model Device {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+}
+
+model SignupVerification {
+  email     String   @id
+  codeHash  String
+  expiresAt DateTime
+  sentAt    DateTime
+  attempts  Int      @default(0)
 }
