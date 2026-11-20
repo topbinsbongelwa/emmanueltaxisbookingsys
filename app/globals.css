@@ -285,6 +285,29 @@ pre { white-space: pre-wrap; font: inherit; margin: 4px 0 0; }
 .terms-page h2 { margin: 0 0 8px; font-size: 19px; }
 .terms-page p { margin: 0 0 10px; }
 .terms-page address { font-style: normal; }
+.popup-backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(16, 43, 98, .45);
+}
+.popup-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  border: 1px solid var(--river);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(16, 43, 98, .3);
+}
+.popup-card h3 { margin: 0 0 8px; color: var(--navy); }
+.popup-card pre { color: var(--ink); }
+.popup-eyebrow { margin: 0 0 4px; color: var(--red); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.popup-card button { margin-top: 18px; width: 100%; }
 
 @media (max-width: 640px) {
   .w { padding: 14px; }

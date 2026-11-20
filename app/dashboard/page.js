@@ -13,27 +13,39 @@ export default function Dash() {
   const r = useRouter();
   const [B, setB] = useState([]), [N, setN] = useState([]), [day, setDay] = useState(hd()), [month, setMonth] = useState(hd().slice(0, 7)), [f, setF] = useState(blank), [err, setErr] = useState("");
   const [me, setMe] = useState(null);
+  const [accountLinks, setAccountLinks] = useState({ linked: [], incoming: [], outgoing: [] });
+  const [linkEmail, setLinkEmail] = useState("");
+  const [linkMessage, setLinkMessage] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [browserPermission, setBrowserPermission] = useState("");
+  const [popup, setPopup] = useState(null);
   const seenNotifications = useRef(new Set());
   const notificationsLoaded = useRef(false);
   const load = useCallback(async () => {
     try {
-      const [a, b] = await Promise.all([fetch("/api/bookings"), fetch("/api/notifications")]);
-      if (a.status === 401) return r.push("/login");
-      const failed = !a.ok ? a : !b.ok ? b : null;
+      const [a, b, c] = await Promise.all([fetch("/api/bookings"), fetch("/api/notifications"), fetch("/api/account-links")]);
+      if (a.status === 401 || b.status === 401 || c.status === 401) return r.push("/login");
+      const failed = !a.ok ? a : !b.ok ? b : !c.ok ? c : null;
       if (failed) {
         const result = await failed.json().catch(() => ({}));
         setErr(result.error || `Could not load your data (${failed.status}). Please try again.`);
         return;
       }
-      const [bookings, notifications] = await Promise.all([a.json(), b.json()]);
+      const [bookings, notifications, links] = await Promise.all([a.json(), b.json(), c.json()]);
       setErr("");
       setB(bookings); setN(notifications);
-      if (notificationsLoaded.current && browserPermission === "granted") {
-        notifications.filter((n) => !seenNotifications.current.has(n.id)).forEach((n) => {
-          new Notification(n.title, { body: n.body, icon: "/logo.png" });
-        });
+      setAccountLinks(links);
+      if (notificationsLoaded.current) {
+        const fresh = notifications.filter((n) => !seenNotifications.current.has(n.id));
+        if (fresh.length) {
+          if (browserPermission === "granted") {
+            fresh.forEach((n) => {
+              new Notification(n.title, { body: n.body, icon: "/logo.png" });
+            });
+          }
+          setPopup(fresh[0]);
+        }
       }
       notifications.forEach((n) => seenNotifications.current.add(n.id));
       notificationsLoaded.current = true;
@@ -53,6 +65,30 @@ export default function Dash() {
     const timer = window.setInterval(load, 20000);
     return () => window.clearInterval(timer);
   }, [load]);
+  useEffect(() => {
+    if (!ready) return;
+    const now = new Date(Date.now() + 7200e3);
+    const today = now.toISOString().slice(0, 10);
+    const tomorrow = new Date(now.getTime() + 86400e3).toISOString().slice(0, 10);
+    const minutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+    B.forEach((b) => {
+      if (!["pending", "booked", "approved"].includes(b.status)) return;
+      if (b.date !== today && b.date !== tomorrow) return;
+      const [h, m] = String(b.time || "").split(":").map(Number);
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return;
+      const until = h * 60 + m + (b.date === tomorrow ? 1440 : 0) - minutes;
+      if (until <= 0 || until > 60) return;
+      const key = "hour_reminder_" + b.id;
+      const stamp = `${b.date}T${b.time}`;
+      let previous = null;
+      try { previous = window.localStorage.getItem(key); } catch {}
+      if (previous === stamp) return;
+      try { window.localStorage.setItem(key, stamp); } catch {}
+      const body = `${b.date} ${b.time}: ${b.pickup} to ${b.dest}; ${b.pax} guest${b.pax === 1 ? "" : "s"}${b.guest ? `; ${b.guest}` : ""}${b.phone ? `; ${b.phone}` : ""}`;
+      setPopup({ title: "Booking in 1 hour", body });
+      if (browserPermission === "granted") new Notification("Booking in 1 hour", { body, icon: "/logo.png" });
+    });
+  }, [B, browserPermission, ready]);
   const enableBrowserNotifications = async () => {
     if ("Notification" in window) setBrowserPermission(await Notification.requestPermission());
   };
@@ -90,6 +126,32 @@ export default function Dash() {
     }
   };
   const read = async () => { await fetch("/api/notifications", { method: "POST" }); load(); };
+  const updateAccountLink = async (method, body, successMessage) => {
+    setLinkBusy(true); setLinkMessage("");
+    try {
+      const response = await fetch("/api/account-links", {
+        method,
+        headers: J,
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setLinkMessage(result.error || "Could not update account sharing.");
+        return;
+      }
+      setLinkMessage(successMessage);
+      setLinkEmail("");
+      await load();
+    } catch {
+      setLinkMessage("Could not update account sharing. Check your connection and try again.");
+    } finally {
+      setLinkBusy(false);
+    }
+  };
+  const requestAccountLink = (event) => {
+    event.preventDefault();
+    updateAccountLink("POST", { email: linkEmail }, "Link request sent. Bookings will be shared after it is accepted.");
+  };
   const out = async () => { await fetch("/api/auth", { method: "POST", headers: J, body: JSON.stringify({ mode: "logout" }) }); r.push("/login"); };
   const t = hd(), wk = hd(7), mo = t.slice(0, 7);
   const harareHour = new Date(Date.now() + 7200e3).getUTCHours();
@@ -145,6 +207,40 @@ export default function Dash() {
         <div className="card stat pending"><b>{B.filter((b) => b.date === t && statusOf(b) === "pending").length}</b>Pending today</div>
         <div className="card stat booked"><b>{B.filter((b) => b.date >= t && b.date <= wk && statusOf(b) === "booked").length}</b>Booked next 7 days</div>
         <div className="card stat approved"><b>{B.filter((b) => b.date.startsWith(mo) && statusOf(b) === "approved").length}</b>Approved this month</div>
+      </div>
+      <div className="card">
+        <strong>Account sharing</strong>
+        <p style={{ color: "#5b6b64" }}>
+          Bookings are private unless another account accepts a link request. {me?.role === "admin" && "As an admin, you can also see every account's bookings."}
+        </p>
+        <form className="bar" onSubmit={requestAccountLink}>
+          <label style={{ flex: "1 1 240px", marginTop: 0 }}>Link an existing account by email
+            <input type="email" value={linkEmail} onChange={(event) => setLinkEmail(event.target.value)} required />
+          </label>
+          <button type="submit" disabled={linkBusy}>Send link request</button>
+        </form>
+        {linkMessage && <p role="status">{linkMessage}</p>}
+        {accountLinks.linked.map((link) => (
+          <div className="bar" key={link.id} style={{ marginTop: 10 }}>
+            <span>Linked with {link.user.name} ({link.user.email})</span>
+            <button type="button" className="g s" disabled={linkBusy} onClick={() => updateAccountLink("DELETE", { linkId: link.id }, "Accounts unlinked.")}>Unlink</button>
+          </div>
+        ))}
+        {accountLinks.incoming.map((link) => (
+          <div className="bar" key={link.id} style={{ marginTop: 10 }}>
+            <span>{link.user.name} ({link.user.email}) wants to share bookings.</span>
+            <div className="bar">
+              <button type="button" className="s" disabled={linkBusy} onClick={() => updateAccountLink("POST", { action: "accept", linkId: link.id }, "Accounts linked. Bookings are now shared.")}>Accept</button>
+              <button type="button" className="g s" disabled={linkBusy} onClick={() => updateAccountLink("POST", { action: "decline", linkId: link.id }, "Link request declined.")}>Decline</button>
+            </div>
+          </div>
+        ))}
+        {accountLinks.outgoing.map((link) => (
+          <div className="bar" key={link.id} style={{ marginTop: 10 }}>
+            <span>Waiting for {link.user.name} ({link.user.email}) to accept.</span>
+            <button type="button" className="g s" disabled={linkBusy} onClick={() => updateAccountLink("DELETE", { linkId: link.id }, "Link request cancelled.")}>Cancel</button>
+          </div>
+        ))}
       </div>
       <div className="card calendar-card">
         <div className="bar">
@@ -222,6 +318,16 @@ export default function Dash() {
         <datalist id="d">{opts("driver")}</datalist><datalist id="v">{opts("vehicle")}</datalist>
         <button style={{ marginTop: 12 }}>Save booking</button>
       </form>
+      {popup && (
+        <div className="popup-backdrop" onClick={() => setPopup(null)}>
+          <div className="popup-card" role="alertdialog" aria-modal="true" aria-labelledby="popup-title" aria-describedby="popup-body" onClick={(event) => event.stopPropagation()}>
+            <p className="popup-eyebrow">{popup.title.toLowerCase().includes("upcoming") ? "Booking reminder" : "Notification"}</p>
+            <h3 id="popup-title">{popup.title}</h3>
+            <pre id="popup-body">{popup.body}</pre>
+            <button onClick={() => setPopup(null)}>OK, got it</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

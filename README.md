@@ -7,9 +7,16 @@
 4. `npm run dev`, then open http://localhost:3000. The FIRST account you create becomes the admin. Later accounts can sign up without an invite code.
 
 ## Notifications
-New, updated, cancelled, and deleted bookings create in-app notifications. Enable browser alerts from the dashboard to receive them while the dashboard is open. A reminder is also sent one day before each upcoming booking.
+New, updated, cancelled, and deleted bookings create in-app notifications for the booking owner and any accounts linked to that owner. New notifications also appear as a popup on the dashboard; enable browser alerts to get the same message as a system notification while the dashboard is open. A reminder is sent one day before each upcoming booking as both an email and a popup message reminder. A second site reminder pops up one hour before each booking while the dashboard is open (and as a system notification if browser alerts are enabled); it shows once per booking.
 
-To receive booking emails, configure SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM in `.env`. Booking emails are sent to the guest email entered on the booking and to ADMIN_EMAIL (or otherwise the first admin account). New accounts can be created with a name, valid email address, and password; email verification and SMTP are not required for signup. For WhatsApp, configure WA_TOKEN, WA_PHONE_ID, and ADMIN_WHATSAPP; the default WhatsApp number is +263 772 645 104 and the dashboard links to https://wa.me/263772645104.
+## Account privacy and sharing
+Bookings are private to the account that created them. On the dashboard, enter another existing account's email to send a link request; bookings become visible to both accounts only after the recipient accepts. Either account can unlink at any time. The first account (admin) can see all bookings; other accounts see only their own and bookings shared through accepted links.
+
+To receive booking emails, configure SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM (and optionally SMTP_FROM_NAME) in `.env`. Every booking and the one-day-before reminder are emailed to `BOOKING_NOTIFICATION_EMAIL` (defaults to `mthabisi45@gmail.com`), the address used to create the account that owns the booking (plus any linked accounts), the guest email entered on the booking, and ADMIN_EMAIL (or otherwise the first admin account). New accounts can be created with a name, valid email address, and password; email verification and SMTP are not required for signup. For WhatsApp, configure WA_TOKEN, WA_PHONE_ID, and ADMIN_WHATSAPP; the default WhatsApp number is +263 772 645 104 and the dashboard links to https://wa.me/263772645104.
+
+For temporary testing, `DEV_TEST_EMAIL` in `.env` also receives every notification email; clear it when testing is done.
+
+For the best chance of landing in the inbox, keep `SMTP_FROM` the same as `SMTP_USER`, and use a sending domain with SPF, DKIM and DMARC configured (Gmail SMTP signs messages with Google's DKIM). Each recipient gets their own email with a reply-to address, an explanation of why they received it, and a unique message ID so Gmail shows each booking as a separate new message instead of grouping them into one thread. If a first message still lands in Spam, mark it as "Not spam" so future messages are trusted. No code change can guarantee inbox placement.
 
 The daily summary and next-day reminders are created and delivered by `GET /api/cron/daily`; Vercel runs it at 06:00 Harare time (04:00 UTC). Local development does not run the Vercel schedule, so trigger that route manually to test them.
 
