@@ -122,22 +122,47 @@ export default function Dash() {
     const today = now.toISOString().slice(0, 10);
     const tomorrow = new Date(now.getTime() + 86400e3).toISOString().slice(0, 10);
     const minutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-    B.forEach((b) => {
-      if (!["pending", "booked", "approved"].includes(b.status)) return;
-      if (b.date !== today && b.date !== tomorrow) return;
-      const [h, m] = String(b.time || "").split(":").map(Number);
-      if (!Number.isFinite(h) || !Number.isFinite(m)) return;
-      const until = h * 60 + m + (b.date === tomorrow ? 1440 : 0) - minutes;
-      if (until <= 0 || until > 60) return;
-      const key = "hour_reminder_" + b.id;
-      const stamp = `${b.date}T${b.time}`;
+    // Show once per booking/date+time; rescheduling resets the stored stamp.
+    const fireReminder = (title, body, key, stamp) => {
       let previous = null;
       try { previous = window.localStorage.getItem(key); } catch {}
       if (previous === stamp) return;
       try { window.localStorage.setItem(key, stamp); } catch {}
-      const body = `${b.date} ${b.time}: ${b.pickup} to ${b.dest}; ${b.pax} guest${b.pax === 1 ? "" : "s"}${b.guest ? `; ${b.guest}` : ""}${b.phone ? `; ${b.phone}` : ""}`;
-      setPopup({ title: "Booking in 1 hour", body });
-      if (browserPermission === "granted") new Notification("Booking in 1 hour", { body, icon: "/logo.png" });
+      setPopup({ title, body });
+      if (browserPermission === "granted") {
+        try { new Notification(title, { body, icon: "/logo.png" }); } catch {}
+      }
+    };
+    B.forEach((b) => {
+      if (!["pending", "booked", "approved"].includes(statusOf(b))) return;
+      const [h, m] = String(b.time || "").split(":").map(Number);
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return;
+      const stamp = `${b.date}T${b.time}`;
+      const detail = `${b.pickup} to ${b.dest}; ${b.pax} guest${b.pax === 1 ? "" : "s"}${b.guest ? `; ${b.guest}` : ""}${b.phone ? `; ${b.phone}` : ""}`;
+      // One day before (CAT): any time while the booking is dated tomorrow.
+      if (b.date === tomorrow) {
+        const emailStatus = b.reminderSentAt
+          ? "The tomorrow email reminder was sent."
+          : "The tomorrow email reminder is pending — see the Tomorrow's bookings banner.";
+        fireReminder(
+          "Booking tomorrow — email reminder",
+          `${b.time} CAT tomorrow (${b.date}): ${detail}. ${emailStatus}`,
+          "day_before_reminder_" + b.id,
+          stamp
+        );
+      }
+      // One hour before (CAT), including bookings early tomorrow.
+      if (b.date === today || b.date === tomorrow) {
+        const until = h * 60 + m + (b.date === tomorrow ? 1440 : 0) - minutes;
+        if (until > 0 && until <= 60) {
+          fireReminder(
+            "Booking in 1 hour — email reminder",
+            `In ${until} minute${until === 1 ? "" : "s"} at ${b.time} CAT (${b.date}): ${detail}.`,
+            "hour_reminder_" + b.id,
+            stamp
+          );
+        }
+      }
     });
   }, [B, browserPermission, ready]);
   const enableBrowserNotifications = async () => {
@@ -282,7 +307,7 @@ export default function Dash() {
       {tomorrowB.length > 0 && (
         <div className="card tomorrow-banner">
           <strong>Tomorrow's bookings ({tomorrowB.length})</strong>
-          <p>Next-day email reminder: these bookings are due on {tomorrowDate}.</p>
+          <p>Next-day email reminder: these bookings are due on {tomorrowDate} (times in CAT).</p>
           {tomorrowB.map((b) => (
             <div key={b.id} className="tomorrow-item">
               <b>{b.time}</b> · {b.pickup} to {b.dest} · {b.pax} guest{b.pax > 1 ? "s" : ""}
@@ -392,7 +417,7 @@ export default function Dash() {
             <span className={log.ok ? "log-ok" : "log-fail"}>{log.ok ? "✓" : "✗"}</span>
             <span>{log.type}</span>
             <span>{log.bookingId || "reminder digest"}</span>
-            <span>{new Date(log.createdAt).toLocaleString("en-GB", { timeZone: "Africa/Harare" })}</span>
+            <span>{new Date(log.createdAt).toLocaleString("en-GB", { timeZone: "Africa/Harare" })} CAT</span>
             {!!log.error && <small className="log-error">{log.error}</small>}
           </div>
         ))}
@@ -440,7 +465,7 @@ export default function Dash() {
       {popup && (
         <div className="popup-backdrop" onClick={() => setPopup(null)}>
           <div className="popup-card" role="alertdialog" aria-modal="true" aria-labelledby="popup-title" aria-describedby="popup-body" onClick={(event) => event.stopPropagation()}>
-            <p className="popup-eyebrow">{popup.title.toLowerCase().includes("upcoming") ? "Booking reminder" : "Notification"}</p>
+            <p className="popup-eyebrow">{popup.title.toLowerCase().includes("reminder") ? "Booking reminder" : "Notification"}</p>
             <h3 id="popup-title">{popup.title}</h3>
             <pre id="popup-body">{popup.body}</pre>
             <button onClick={() => setPopup(null)}>OK, got it</button>

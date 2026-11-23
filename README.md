@@ -10,6 +10,7 @@
 
 Booking emails go **only** to `mthabisi45@gmail.com` through the free FormSubmit AJAX endpoint. No SMTP account, custom domain, paid service or WhatsApp is required.
 
+- All dates and times in emails are shown in Africa/Harare (CAT, UTC+2); each email includes a `Time zone` row and a `Sent at (CAT)` row so the delivery time is not confused with UTC.
 - Saving a booking emails `New Booking: {guest} - {date}`.
 - Editing emails `Booking Updated: ...`; cancelling emails `Booking Cancelled: ...`.
 - A single digest email `Tomorrow's Bookings ({date}) - {count}` is sent once a day for all non-cancelled bookings dated tomorrow in Africa/Harare (UTC+2). Only bookings whose email succeeded are marked with `reminderSentAt`, so a failed email is retried on the next run.
@@ -23,7 +24,7 @@ The first submission to FormSubmit sends an activation email to `mthabisi45@gmai
 Administrators can click **Send test email** on the dashboard. It calls `POST /api/test-notify`, which also accepts `Authorization: Bearer <CRON_SECRET>` for manual testing from a terminal. The result is logged and shown as a toast.
 
 ## In-app notifications
-New, updated and cancelled bookings also create in-app notifications for the booking owner and linked accounts. Popups appear on the dashboard; each user can enable browser alerts. A second site reminder pops up one hour before each booking while the dashboard is open.
+New, updated and cancelled bookings also create in-app notifications for the booking owner and linked accounts. Popups appear on the dashboard; each user can enable browser alerts. While the dashboard is open, a popup appears one day before each booking (showing whether the email reminder was sent) and again one hour before the booking, in CAT. Each popup shows once per booking date/time and reappears if the booking is rescheduled.
 
 ## Account privacy and sharing
 Bookings are private to the account that created them. On the dashboard, enter another existing account's email to send a link request; bookings become visible to both accounts only after the recipient accepts. Either account can unlink at any time. The first account (admin) can see all bookings.
