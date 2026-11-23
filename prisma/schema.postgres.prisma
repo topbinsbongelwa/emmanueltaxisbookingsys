@@ -36,8 +36,22 @@ model Booking {
   notes     String   @default("")
   status    String   @default("booked")
   reminderSent Boolean @default(false)
+  // 1-day-before digest email timestamp; null until a reminder is delivered.
+  reminderSentAt DateTime?
   createdBy String
   createdAt DateTime @default(now())
+}
+
+/// Delivery history shown in the dashboard "Email notifications" section.
+model NotificationLog {
+  id        String   @id @default(cuid())
+  bookingId String?
+  type      String
+  ok        Boolean
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model Notification {

@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { sendFormSubmitRequest } from "@/lib/booking-email";
 const hd = (n = 0) => { const d = new Date(Date.now() + 7200e3); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const pad = (n) => String(n).padStart(2, "0");
 const statusOf = (b) => (b.status === "done" ? "approved" : b.status);
 const STATUS_LABEL = { pending: "Pending", booked: "Booked", approved: "Approved", cancelled: "Cancelled" };
 const blank = { time: "08:00", type: "transfer", pickup: "", dest: "", pax: 1, guest: "", email: "", phone: "", driver: "", vehicle: "", notes: "" };
-const BUSINESS_WHATSAPP = "263772645104";
 const J = { "Content-Type": "application/json" };
 const COLORS = ["pending", "booked", "approved"];
 export default function Dash() {
@@ -20,22 +20,70 @@ export default function Dash() {
   const [ready, setReady] = useState(false);
   const [browserPermission, setBrowserPermission] = useState("");
   const [popup, setPopup] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [emailLogs, setEmailLogs] = useState([]);
+  const [testBusy, setTestBusy] = useState(false);
+  const toastTimer = useRef(null);
   const seenNotifications = useRef(new Set());
   const notificationsLoaded = useRef(false);
+  const showToast = useCallback((message, ok) => {
+    setToast({ message, ok });
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 6000);
+  }, []);
+  // If FormSubmit rejected the server call, resend the exact same payload from
+  // the browser and report the real result on the Save button toast.
+  const handleEmailResult = useCallback(async (result) => {
+    if (!result || result.emailFailed === false) {
+      showToast("Booking saved and emailed", true);
+      return;
+    }
+    if (result.emailFailed && result.emailRequest) {
+      const retry = await sendFormSubmitRequest(result.emailRequest);
+      try {
+        await fetch("/api/notification-logs", {
+          method: "POST",
+          headers: J,
+          body: JSON.stringify({
+            bookingId: result.id,
+            type: result.emailType || "new",
+            ok: retry.ok,
+            error: retry.error,
+          }),
+        });
+      } catch (error) {
+        console.error("Could not record browser email result:", error);
+      }
+      showToast(
+        retry.ok
+          ? "Booking saved and emailed"
+          : "Booking saved, but the email could not be sent",
+        retry.ok
+      );
+      return;
+    }
+    showToast("Booking saved, but the email could not be sent", false);
+  }, [showToast]);
   const load = useCallback(async () => {
     try {
-      const [a, b, c] = await Promise.all([fetch("/api/bookings"), fetch("/api/notifications"), fetch("/api/account-links")]);
-      if (a.status === 401 || b.status === 401 || c.status === 401) return r.push("/login");
-      const failed = !a.ok ? a : !b.ok ? b : !c.ok ? c : null;
+      const responses = await Promise.all([
+        fetch("/api/bookings"),
+        fetch("/api/notifications"),
+        fetch("/api/account-links"),
+        fetch("/api/notification-logs"),
+      ]);
+      if (responses.some((x) => x.status === 401)) return r.push("/login");
+      const failed = responses.find((x) => !x.ok);
       if (failed) {
         const result = await failed.json().catch(() => ({}));
         setErr(result.error || `Could not load your data (${failed.status}). Please try again.`);
         return;
       }
-      const [bookings, notifications, links] = await Promise.all([a.json(), b.json(), c.json()]);
+      const [bookings, notifications, links, logs] = await Promise.all(responses.map((x) => x.json()));
       setErr("");
       setB(bookings); setN(notifications);
       setAccountLinks(links);
+      setEmailLogs(logs);
       if (notificationsLoaded.current) {
         const fresh = notifications.filter((n) => !seenNotifications.current.has(n.id));
         if (fresh.length) {
@@ -59,6 +107,9 @@ export default function Dash() {
     if ("Notification" in window) setBrowserPermission(Notification.permission);
     else setBrowserPermission("unsupported");
     fetch("/api/auth").then((x) => (x.ok ? x.json() : null)).then((data) => data?.user && setMe(data.user)).catch(() => {});
+  }, []);
+  useEffect(() => () => {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
   }, []);
   useEffect(() => {
     load();
@@ -99,7 +150,10 @@ export default function Dash() {
       const x = await fetch("/api/bookings", { method: "POST", headers: J, body: JSON.stringify({ ...f, date: day }) });
       const result = await x.json().catch(() => ({}));
       if (!x.ok) return setErr(result.error || "Could not save.");
-      setF(blank); load();
+      setF(blank);
+      await load();
+      await handleEmailResult(result);
+      await load();
     } catch {
       setErr("Could not save. Check your connection and try again.");
     }
@@ -109,7 +163,9 @@ export default function Dash() {
       const x = await fetch("/api/bookings/" + id, { method: "PATCH", headers: J, body: JSON.stringify({ status }) });
       const result = await x.json().catch(() => ({}));
       if (!x.ok) return setErr(result.error || "Could not update this booking.");
-      load();
+      await load();
+      await handleEmailResult(result);
+      await load();
     } catch {
       setErr("Could not update this booking. Check your connection and try again.");
     }
@@ -126,6 +182,23 @@ export default function Dash() {
     }
   };
   const read = async () => { await fetch("/api/notifications", { method: "POST" }); load(); };
+  const sendTest = async () => {
+    setTestBusy(true);
+    try {
+      const x = await fetch("/api/test-notify", { method: "POST" });
+      const result = await x.json().catch(() => ({}));
+      if (!x.ok) return showToast(result.error || "Test email failed", false);
+      showToast(
+        result.ok ? "Test email sent" : `Test email failed: ${result.error || "unknown error"}`,
+        !!result.ok
+      );
+      await load();
+    } catch {
+      showToast("Test email failed", false);
+    } finally {
+      setTestBusy(false);
+    }
+  };
   const updateAccountLink = async (method, body, successMessage) => {
     setLinkBusy(true); setLinkMessage("");
     try {
@@ -159,6 +232,9 @@ export default function Dash() {
   const dayB = B.filter((b) => b.date === day);
   const opts = (k) => [...new Set(B.map((b) => b[k]).filter(Boolean))].map((v) => <option key={v} value={v} />);
   const unread = N.filter((n) => !n.read).length;
+  const tomorrowDate = hd(1);
+  const tomorrowB = B.filter((b) => b.date === tomorrowDate && statusOf(b) !== "cancelled")
+    .sort((a, b) => String(a.time).localeCompare(String(b.time)));
 
   const [y, m] = month.split("-").map(Number);
   const first = new Date(Date.UTC(y, m - 1, 1));
@@ -197,12 +273,26 @@ export default function Dash() {
 
   return (
     <div className="w">
-      <div className="bar" style={{ marginBottom: 12 }}><div className="brand"><img src="/logo.png" alt="Emmanuel Tours & Transfers, Victoria Falls" /><h2>Bookings</h2></div><div className="bar"><a className="g wa-link" href={`https://wa.me/${BUSINESS_WHATSAPP}`} target="_blank" rel="noreferrer">WhatsApp</a><button className="g" onClick={out}>Log out</button></div></div>
+      <div className="bar" style={{ marginBottom: 12 }}><div className="brand"><img src="/logo.png" alt="Emmanuel Tours & Transfers, Victoria Falls" /><h2>Bookings</h2></div><div className="bar"><button className="g" onClick={out}>Log out</button></div></div>
       <div className="dashboard-intro">
         <div><p className="eyebrow">OPERATIONS</p><h1>{greeting}, {me?.name || "there"}</h1></div>
         <p>Your booking system</p>
       </div>
       {err && <div className="err">{err}</div>}
+      {tomorrowB.length > 0 && (
+        <div className="card tomorrow-banner">
+          <strong>Tomorrow's bookings ({tomorrowB.length})</strong>
+          <p>Next-day email reminder: these bookings are due on {tomorrowDate}.</p>
+          {tomorrowB.map((b) => (
+            <div key={b.id} className="tomorrow-item">
+              <b>{b.time}</b> · {b.pickup} to {b.dest} · {b.pax} guest{b.pax > 1 ? "s" : ""}
+              {b.guest ? ` · ${b.guest}` : ""}
+              {b.phone ? ` · ${b.phone}` : ""}
+              {b.reminderSentAt ? " · emailed" : " · reminder pending"}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="stats">
         <div className="card stat pending"><b>{B.filter((b) => b.date === t && statusOf(b) === "pending").length}</b>Pending today</div>
         <div className="card stat booked"><b>{B.filter((b) => b.date >= t && b.date <= wk && statusOf(b) === "booked").length}</b>Booked next 7 days</div>
@@ -274,7 +364,7 @@ export default function Dash() {
         </div>
       </div>
       <div className="card">
-        <div className="bar"><strong>Notifications {unread > 0 && `(${unread} new)`}</strong><div className="bar">
+        <div className="bar"><strong>In-app notifications {unread > 0 && `(${unread} new)`}</strong><div className="bar">
           {browserPermission === "default" && <button className="g s" onClick={enableBrowserNotifications}>Enable browser alerts</button>}
           {browserPermission === "granted" && <small>Browser alerts enabled</small>}
           {browserPermission === "denied" && <small>Allow notifications in browser settings</small>}
@@ -283,6 +373,29 @@ export default function Dash() {
         {browserPermission === "unsupported" && <p style={{ color: "#5b6b64" }}>Browser alerts are not available in this browser.</p>}
         {N.length === 0 && <p style={{ color: "#5b6b64" }}>No notifications yet.</p>}
         {N.slice(0, 3).map((n) => (<div key={n.id} style={{ marginTop: 8, fontWeight: n.read ? 400 : 600 }}>{n.title}<pre>{n.body}</pre></div>))}
+      </div>
+      <div className="card">
+        <div className="bar">
+          <strong>Email notifications</strong>
+          {me?.role === "admin" && (
+            <button className="g s" onClick={sendTest} disabled={testBusy}>
+              {testBusy ? "Sending..." : "Send test email"}
+            </button>
+          )}
+        </div>
+        <p style={{ color: "#5b6b64" }}>
+          Bookings are emailed through FormSubmit. Green ✓ = accepted, red ✗ = failed (first-time activation may be needed).
+        </p>
+        {emailLogs.length === 0 && <p style={{ color: "#5b6b64" }}>No emails sent yet.</p>}
+        {emailLogs.map((log) => (
+          <div key={log.id} className="email-log">
+            <span className={log.ok ? "log-ok" : "log-fail"}>{log.ok ? "✓" : "✗"}</span>
+            <span>{log.type}</span>
+            <span>{log.bookingId || "reminder digest"}</span>
+            <span>{new Date(log.createdAt).toLocaleString("en-GB", { timeZone: "Africa/Harare" })}</span>
+            {!!log.error && <small className="log-error">{log.error}</small>}
+          </div>
+        ))}
       </div>
       <div className="card">
         <div className="bar"><label style={{ marginTop: 0 }}>Bookings for</label><input type="date" style={{ maxWidth: 190 }} value={day} onChange={(e) => e.target.value && setDay(e.target.value)} /></div>
@@ -314,10 +427,16 @@ export default function Dash() {
         <div className="row"><div><label>Guest email</label><input type="email" value={f.email} onChange={set("email")} placeholder="guest@example.com" /></div>
           <div><label>Guest phone</label><input value={f.phone} onChange={set("phone")} /></div></div>
         <div className="row"><div><label>Notes</label><input value={f.notes} onChange={set("notes")} /></div>
-          <div><label>WhatsApp notifications</label><a className="wa-link wide" href={`https://wa.me/${BUSINESS_WHATSAPP}`} target="_blank" rel="noreferrer">Chat on +263 772 645 104</a></div></div>
+          <div><label>Email notifications</label><p style={{ margin: "5px 0 0", color: "#5b6b64" }}>A copy is emailed to mthabisi45@gmail.com when you save.</p></div></div>
         <datalist id="d">{opts("driver")}</datalist><datalist id="v">{opts("vehicle")}</datalist>
         <button style={{ marginTop: 12 }}>Save booking</button>
       </form>
+      {toast && (
+        <div className={"toast " + (toast.ok ? "ok" : "fail")} role="status">
+          <span>{toast.ok ? "✓" : "✗"} {toast.message}</span>
+          <button type="button" className="g s" onClick={() => setToast(null)} aria-label="Dismiss">×</button>
+        </div>
+      )}
       {popup && (
         <div className="popup-backdrop" onClick={() => setPopup(null)}>
           <div className="popup-card" role="alertdialog" aria-modal="true" aria-labelledby="popup-title" aria-describedby="popup-body" onClick={(event) => event.stopPropagation()}>
