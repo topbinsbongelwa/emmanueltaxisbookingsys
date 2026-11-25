@@ -4,7 +4,7 @@
  * email body is identical no matter which side sends it.
  */
 
-export type BookingEmailType = "new" | "updated" | "cancelled" | "reminder";
+export type BookingEmailType = "new" | "updated" | "cancelled" | "reminder" | "reminder1h";
 
 /** The booking fields needed to build a notification email. */
 export interface NotificationBooking {
@@ -40,6 +40,7 @@ const SUBJECTS: Record<BookingEmailType, string> = {
   updated: "Booking Updated",
   cancelled: "Booking Cancelled",
   reminder: "Booking Reminder (Tomorrow)",
+  reminder1h: "Booking Reminder (In 1 hour)",
 };
 
 const asText = (value: unknown): string => String(value ?? "").trim();
@@ -140,6 +141,7 @@ export function buildBookingEmailRequest(
     Vehicle: asText(booking.vehicle) || "-",
     "Created by": asText(booking.createdBy) || "-",
   };
+  if (type === "reminder1h") fields.Reminder = "Sent 1 hour before the booking time";
   return buildFormSubmitRequest(recipient, fields, origin);
 }
 

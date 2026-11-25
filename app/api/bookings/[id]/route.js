@@ -35,6 +35,7 @@ export const PATCH = withApi(async (req, { params }) => {
   if (rescheduled || reopened) {
     data.reminderSentAt = null;
     data.reminderSent = false;
+    data.hourReminderSentAt = null;
   }
 
   const booking = await prisma.booking.update({ where: { id: params.id }, data });

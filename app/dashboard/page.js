@@ -161,6 +161,21 @@ export default function Dash() {
             "hour_reminder_" + b.id,
             stamp
           );
+          const emailKey = "hour_email_" + b.id;
+          let emailedStamp = null;
+          try { emailedStamp = window.localStorage.getItem(emailKey); } catch {}
+          if (emailedStamp !== stamp) {
+            fetch("/api/reminders/hourly", {
+              method: "POST", headers: J, body: JSON.stringify({ bookingId: b.id }),
+            })
+              .then((x) => x.json().catch(() => ({})))
+              .then((result) => {
+                if (result.ok && result.results?.some((r) => r.id === b.id && r.ok)) {
+                  try { window.localStorage.setItem(emailKey, stamp); } catch {}
+                }
+              })
+              .catch(() => {});
+          }
         }
       }
     });

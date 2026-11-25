@@ -29,7 +29,7 @@ export const POST = withApi(async (req) => {
   const session = await getSession();
   if (!session) return Response.json({ error: "Sign in" }, { status: 401 });
   const body = await req.json().catch(() => ({}));
-  const type = ["new", "updated", "cancelled", "reminder"].includes(body.type)
+  const type = ["new", "updated", "cancelled", "reminder", "reminder1h"].includes(body.type)
     ? body.type
     : "new";
   await prisma.notificationLog.create({

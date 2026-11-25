@@ -38,6 +38,7 @@ model Booking {
   reminderSent Boolean @default(false)
   // 1-day-before digest email timestamp; null until a reminder is delivered.
   reminderSentAt DateTime?
+  hourReminderSentAt DateTime?
   createdBy String
   createdAt DateTime @default(now())
 }
